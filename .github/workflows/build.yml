@@ -18,18 +18,16 @@ jobs:
 
     - name: Build APK with Gradle
       run: |
-        # Tải và cài đặt Gradle tự động trên máy chủ mây
         gradle_version=8.0
         wget -q https://services.gradle.org/distributions/gradle-${gradle_version}-bin.zip
         unzip -q gradle-${gradle_version}-bin.zip
         export PATH=$PWD/gradle-${gradle_version}/bin:$PATH
         
-        # Khởi tạo môi trường gradle và build ra file APK debug
         gradle wrapper
         ./gradlew assembleDebug
 
     - name: Upload APK artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: app-debug
         path: app/build/outputs/apk/debug/app-debug.apk
