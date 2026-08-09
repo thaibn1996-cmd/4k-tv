@@ -21,7 +21,6 @@ public class MainActivity extends AppCompatActivity {
         webSettings.setLoadsImagesAutomatically(true);
         webSettings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
 
-        // Nhúng mã nguồn quản lý Focus và Highlight kiểu Android TV khi trang web tải xong
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageFinished(WebView view, String url) {
@@ -33,7 +32,6 @@ public class MainActivity extends AppCompatActivity {
         webView.loadUrl("https://hhpanda.st/");
     }
 
-    // HỆ THỐNG ĐIỀU HƯỚNG FOCUS & HIGHLIGHT KIỂU ANDROID TV
     private void injectTvFocusEngine(WebView view) {
         String script = "javascript:(function() {" +
             "if (window.hasTvFocusEngine) return;" +
@@ -43,8 +41,10 @@ public class MainActivity extends AppCompatActivity {
             "let focusableElements = [];" +
             "" +
             "function updateFocusables() {" +
-            "    const raw = document.querySelectorAll('a, button, input, [tabindex=\"0\"]');" +
-            "    focusableElements = Array.from(raw).filter(el => {" +
+            "    // Lọc lấy các thẻ link, poster phim, nút bấm thực sự hiển thị trên trang" +
+            "    const raw = document.querySelectorAll('a.halim-trending-link, a.halim-thumb, .page-numbers, header a, .site-header a');" +
+            "    const allClickables = raw.length > 0 ? raw : document.querySelectorAll('a, button');" +
+            "    focusableElements = Array.from(allClickables).filter(el => {" +
             "        const rect = el.getBoundingClientRect();" +
             "        return rect.width > 0 && rect.height > 0 && window.getComputedStyle(el).visibility !== 'hidden';" +
             "    });" +
@@ -57,12 +57,11 @@ public class MainActivity extends AppCompatActivity {
             "    updateFocusables();" +
             "    focusableElements.forEach((el, idx) => {" +
             "        if (idx === currentIndex) {" +
-            "            // Hiệu ứng phát sáng, phóng to và đổi màu viền giống app TV chuẩn" +
             "            el.style.outline = '4px solid #00e5ff';" +
-            "            el.style.transform = 'scale(1.07);';" +
+            "            el.style.transform = 'scale(1.06)';" +
             "            el.style.boxShadow = '0 0 25px rgba(0, 229, 255, 0.9)';" +
             "            el.style.zIndex = '999999';" +
-            "            el.style.transition = 'all 0.2s ease';" +
+            "            el.style.transition = 'all 0.15s ease';" +
             "            el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });" +
             "        } else {" +
             "            el.style.outline = '';" +
@@ -73,41 +72,51 @@ public class MainActivity extends AppCompatActivity {
             "    });" +
             "}" +
             "" +
-            "// Khởi tạo focus sau khi trang load xong" +
-            "setTimeout(applyFocus, 800);" +
+            "setTimeout(applyFocus, 1000);" +
             "" +
-            "// Lắng nghe sự kiện phím bấm trên Remote TV" +
-            "document.addEventListener('keydown', function(e) {" +
+            "// Thuật toán tìm phần tử gần nhất theo hướng mũi tên (Spatial Navigation)" +
+            "function navigate(direction) {" +
             "    updateFocusables();" +
             "    if (focusableElements.length === 0) return;" +
+            "    let currentRect = focusableElements[currentIndex].getBoundingClientRect();" +
+            "    let bestIndex = currentIndex;" +
+            "    let minDist = Infinity;" +
             "" +
-            "    let moved = false;" +
-            "    const columns = 4; // Giả lập bố cục lưới khoảng 4 cột phim" +
+            "    focusableElements.forEach((el, idx) => {" +
+            "        if (idx === currentIndex) return;" +
+            "        let rect = el.getBoundingClientRect();" +
+            "        let dx = rect.left - currentRect.left;" +
+            "        let dy = rect.top - currentRect.top;" +
+            "        let dist = Math.sqrt(dx * dx + dy * dy);" +
             "" +
-            "    if (e.key === 'ArrowRight') {" +
-            "        currentIndex = Math.min(currentIndex + 1, focusableElements.length - 1);" +
-            "        moved = true;" +
-            "    } else if (e.key === 'ArrowLeft') {" +
-            "        currentIndex = Math.max(currentIndex - 1, 0);" +
-            "        moved = true;" +
-            "    } else if (e.key === 'ArrowDown') {" +
-            "        currentIndex = Math.min(currentIndex + columns, focusableElements.length - 1);" +
-            "        moved = true;" +
-            "    } else if (e.key === 'ArrowUp') {" +
-            "        currentIndex = Math.max(currentIndex - columns, 0);" +
-            "        moved = true;" +
-            "    } else if (e.key === 'Enter' || e.keyCode === 13 || e.keyCode === 23) {" +
+            "        if (direction === 'down' && dy > 0 && Math.abs(dx) < 350) {" +
+            "            if (dist < minDist) { minDist = dist; bestIndex = idx; }" +
+            "        } else if (direction === 'up' && dy < 0 && Math.abs(dx) < 350) {" +
+            "            if (dist < minDist) { minDist = dist; bestIndex = idx; }" +
+            "        } else if (direction === 'right' && dx > 0 && Math.abs(dy) < 150) {" +
+            "            if (dist < minDist) { minDist = dist; bestIndex = idx; }" +
+            "        } else if (direction === 'left' && dx < 0 && Math.abs(dy) < 150) {" +
+            "            if (dist < minDist) { minDist = dist; bestIndex = idx; }" +
+            "        }" +
+            "    });" +
+            "" +
+            "    if (bestIndex !== currentIndex) {" +
+            "        currentIndex = bestIndex;" +
+            "        applyFocus();" +
+            "    }" +
+            "}" +
+            "" +
+            "document.addEventListener('keydown', function(e) {" +
+            "    if (e.key === 'ArrowRight') { e.preventDefault(); navigate('right'); }" +
+            "    else if (e.key === 'ArrowLeft') { e.preventDefault(); navigate('left'); }" +
+            "    else if (e.key === 'ArrowDown') { e.preventDefault(); navigate('down'); }" +
+            "    else if (e.key === 'ArrowUp') { e.preventDefault(); navigate('up'); }" +
+            "    else if (e.key === 'Enter' || e.keyCode === 13 || e.keyCode === 23) {" +
             "        e.preventDefault();" +
             "        if (focusableElements[currentIndex]) {" +
             "            focusableElements[currentIndex].click();" +
-            "            // Đợi trang mới load xong thì reset lại focus" +
-            "            setTimeout(applyFocus, 1500);" +
+            "            setTimeout(applyFocus, 1800);" +
             "        }" +
-            "    }" +
-            "" +
-            "    if (moved) {" +
-            "        e.preventDefault();" +
-            "        applyFocus();" +
             "    }" +
             "}, true);" +
             "})();";
