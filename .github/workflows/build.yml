@@ -16,8 +16,9 @@ jobs:
         distribution: 'temurin'
         java-version: '17'
 
-    - name: Setup Android SDK
-      uses: android-actions/setup-android@v3
+    - name: Create local.properties
+      run: |
+        echo "sdk.dir=/usr/local/lib/android/sdk" > local.properties
 
     - name: Build APK with Gradle
       run: |
