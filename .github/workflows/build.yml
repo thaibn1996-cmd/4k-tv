@@ -16,15 +16,16 @@ jobs:
         distribution: 'temurin'
         java-version: '17'
 
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+
     - name: Build APK with Gradle
       run: |
-        # Tải và cài đặt Gradle bản 8.4 trực tiếp trên máy chủ
         gradle_version=8.4
         wget -q https://services.gradle.org/distributions/gradle-${gradle_version}-bin.zip
         unzip -q gradle-${gradle_version}-bin.zip
         export PATH=$PWD/gradle-${gradle_version}/bin:$PATH
         
-        # Dùng trực tiếp lệnh gradle toàn cục để build, không cần gọi file ./gradlew nữa
         gradle assembleDebug
 
     - name: Upload APK artifact
