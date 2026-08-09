@@ -18,14 +18,14 @@ jobs:
 
     - name: Build APK with Gradle
       run: |
-        gradle_version=8.0
+        # Tải và cài đặt Gradle bản 8.4 trực tiếp trên máy chủ
+        gradle_version=8.4
         wget -q https://services.gradle.org/distributions/gradle-${gradle_version}-bin.zip
         unzip -q gradle-${gradle_version}-bin.zip
         export PATH=$PWD/gradle-${gradle_version}/bin:$PATH
         
-        gradle wrapper
-        chmod +x ./gradlew
-        ./gradlew assembleDebug
+        # Dùng trực tiếp lệnh gradle toàn cục để build, không cần gọi file ./gradlew nữa
+        gradle assembleDebug
 
     - name: Upload APK artifact
       uses: actions/upload-artifact@v4
