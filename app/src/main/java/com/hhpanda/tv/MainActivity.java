@@ -25,26 +25,26 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
-                injectTvFocusEngine(view);
+                injectSpatialNavigation(view);
             }
         });
 
         webView.loadUrl("https://hhpanda.st/");
     }
 
-    private void injectTvFocusEngine(WebView view) {
+    // HỆ THỐNG ĐIỀU HƯỚNG TỌA ĐỘ KHÔNG GIAN CHO ANDROID TV
+    private void injectSpatialNavigation(WebView view) {
         String script = "javascript:(function() {" +
-            "if (window.hasTvFocusEngine) return;" +
-            "window.hasTvFocusEngine = true;" +
+            "if (window.hasSpatialNav) return;" +
+            "window.hasSpatialNav = true;" +
             "" +
             "let currentIndex = 0;" +
             "let focusableElements = [];" +
             "" +
-            "function updateFocusables() {" +
-            "    // Lọc lấy các thẻ link, poster phim, nút bấm thực sự hiển thị trên trang" +
-            "    const raw = document.querySelectorAll('a.halim-trending-link, a.halim-thumb, .page-numbers, header a, .site-header a');" +
-            "    const allClickables = raw.length > 0 ? raw : document.querySelectorAll('a, button');" +
-            "    focusableElements = Array.from(allClickables).filter(el => {" +
+            "function updateElements() {" +
+            "    // Gom tất cả các liên kết poster, menu, tab lịch chiếu và nút bấm có thật trên trang" +
+            "    const raw = document.querySelectorAll('a.halim-trending-link, a.halim-thumb, header a, .navbar a, .halim-schedule-block a, .halim-schedule-block-mobile a, .page-numbers, button');" +
+            "    focusableElements = Array.from(raw).filter(el => {" +
             "        const rect = el.getBoundingClientRect();" +
             "        return rect.width > 0 && rect.height > 0 && window.getComputedStyle(el).visibility !== 'hidden';" +
             "    });" +
@@ -53,8 +53,8 @@ public class MainActivity extends AppCompatActivity {
             "    }" +
             "}" +
             "" +
-            "function applyFocus() {" +
-            "    updateFocusables();" +
+            "function renderFocus() {" +
+            "    updateElements();" +
             "    focusableElements.forEach((el, idx) => {" +
             "        if (idx === currentIndex) {" +
             "            el.style.outline = '4px solid #00e5ff';" +
@@ -72,50 +72,63 @@ public class MainActivity extends AppCompatActivity {
             "    });" +
             "}" +
             "" +
-            "setTimeout(applyFocus, 1000);" +
+            "setTimeout(renderFocus, 1000);" +
             "" +
-            "// Thuật toán tìm phần tử gần nhất theo hướng mũi tên (Spatial Navigation)" +
-            "function navigate(direction) {" +
-            "    updateFocusables();" +
+            "// Thuật toán tìm phần tử gần nhất dựa trên khoảng cách tọa độ màn hình (X, Y)" +
+            "function moveFocus(dir) {" +
+            "    updateElements();" +
             "    if (focusableElements.length === 0) return;" +
-            "    let currentRect = focusableElements[currentIndex].getBoundingClientRect();" +
+            "" +
+            "    const currentEl = focusableElements[currentIndex] || focusableElements[0];" +
+            "    const curRect = currentEl.getBoundingClientRect();" +
             "    let bestIndex = currentIndex;" +
-            "    let minDist = Infinity;" +
+            "    let minScore = Infinity;" +
             "" +
             "    focusableElements.forEach((el, idx) => {" +
             "        if (idx === currentIndex) return;" +
-            "        let rect = el.getBoundingClientRect();" +
-            "        let dx = rect.left - currentRect.left;" +
-            "        let dy = rect.top - currentRect.top;" +
-            "        let dist = Math.sqrt(dx * dx + dy * dy);" +
+            "        const rect = el.getBoundingClientRect();" +
+            "        const dx = rect.left + rect.width/2 - (curRect.left + curRect.width/2);" +
+            "        const dy = rect.top + rect.height/2 - (curRect.top + curRect.height/2);" +
             "" +
-            "        if (direction === 'down' && dy > 0 && Math.abs(dx) < 350) {" +
-            "            if (dist < minDist) { minDist = dist; bestIndex = idx; }" +
-            "        } else if (direction === 'up' && dy < 0 && Math.abs(dx) < 350) {" +
-            "            if (dist < minDist) { minDist = dist; bestIndex = idx; }" +
-            "        } else if (direction === 'right' && dx > 0 && Math.abs(dy) < 150) {" +
-            "            if (dist < minDist) { minDist = dist; bestIndex = idx; }" +
-            "        } else if (direction === 'left' && dx < 0 && Math.abs(dy) < 150) {" +
-            "            if (dist < minDist) { minDist = dist; bestIndex = idx; }" +
+            "        let isValidDirection = false;" +
+            "        let score = Infinity;" +
+            "" +
+            "        if (dir === 'right' && dx > 0) {" +
+            "            score = Math.abs(dy) * 2 + dx;" +
+            "            isValidDirection = true;" +
+            "        } else if (dir === 'left' && dx < 0) {" +
+            "            score = Math.abs(dy) * 2 + Math.abs(dx);" +
+            "            isValidDirection = true;" +
+            "        } else if (dir === 'down' && dy > 0) {" +
+            "            score = Math.abs(dx) * 2 + dy;" +
+            "            isValidDirection = true;" +
+            "        } else if (dir === 'up' && dy < 0) {" +
+            "            score = Math.abs(dx) * 2 + Math.abs(dy);" +
+            "            isValidDirection = true;" +
+            "        }" +
+            "" +
+            "        if (isValidDirection && score < minScore) {" +
+            "            minScore = score;" +
+            "            bestIndex = idx;" +
             "        }" +
             "    });" +
             "" +
             "    if (bestIndex !== currentIndex) {" +
             "        currentIndex = bestIndex;" +
-            "        applyFocus();" +
+            "        renderFocus();" +
             "    }" +
             "}" +
             "" +
             "document.addEventListener('keydown', function(e) {" +
-            "    if (e.key === 'ArrowRight') { e.preventDefault(); navigate('right'); }" +
-            "    else if (e.key === 'ArrowLeft') { e.preventDefault(); navigate('left'); }" +
-            "    else if (e.key === 'ArrowDown') { e.preventDefault(); navigate('down'); }" +
-            "    else if (e.key === 'ArrowUp') { e.preventDefault(); navigate('up'); }" +
+            "    if (e.key === 'ArrowRight') { e.preventDefault(); moveFocus('right'); }" +
+            "    else if (e.key === 'ArrowLeft') { e.preventDefault(); moveFocus('left'); }" +
+            "    else if (e.key === 'ArrowDown') { e.preventDefault(); moveFocus('down'); }" +
+            "    else if (e.key === 'ArrowUp') { e.preventDefault(); moveFocus('up'); }" +
             "    else if (e.key === 'Enter' || e.keyCode === 13 || e.keyCode === 23) {" +
             "        e.preventDefault();" +
             "        if (focusableElements[currentIndex]) {" +
             "            focusableElements[currentIndex].click();" +
-            "            setTimeout(applyFocus, 1800);" +
+            "            setTimeout(renderFocus, 2000);" +
             "        }" +
             "    }" +
             "}, true);" +
